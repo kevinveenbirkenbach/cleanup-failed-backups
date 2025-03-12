@@ -1,4 +1,6 @@
 # Cleanup Failed Docker Backups
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-blue?logo=github)](https://github.com/sponsors/kevinveenbirkenbach) [![Patreon](https://img.shields.io/badge/Support-Patreon-orange?logo=patreon)](https://www.patreon.com/c/kevinveenbirkenbach) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20Coffee-Funding-yellow?logo=buymeacoffee)](https://buymeacoffee.com/kevinveenbirkenbach) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://s.veen.world/paypaldonate)
+
 
 This repository hosts a Bash script designed for cleaning up directories within the Docker Volume Backup system. It is intended to be used in conjunction with the [Docker Volume Backup](https://github.com/kevinveenbirkenbach/docker-volume-backup) project.
 
