@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+WORKDIR /opt/app
+
+# Copy project
+COPY . .
+
+# Install the project (editable is fine for tests)
+RUN python -m pip install -U pip \
+ && python -m pip install -e . \
+ && python -m pip install -U unittest-xml-reporting >/dev/null 2>&1 || true
+
+# Create /Backups in container (our tests will use it)
+RUN mkdir -p /Backups
+
+# Run E2E unittest
+CMD ["python", "-m", "unittest", "-v", "tests.e2e.test_e2e_docker"]

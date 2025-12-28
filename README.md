@@ -7,95 +7,134 @@
 
 **Repository:** https://github.com/kevinveenbirkenbach/cleanup-failed-backups
 
-This tool validates and (optionally) cleans up **failed Docker backup directories**.  
-It scans backup folders under `/Backups`, uses [`dirval`](https://github.com/kevinveenbirkenbach/directory-validator) to validate each subdirectory, and lets you delete the ones that fail validation. Validation runs **in parallel** for performance; deletions are controlled and can be interactive or automatic.
+`cleanback` validates and (optionally) cleans up **failed Docker backup directories**.  
+It scans backup folders under `/Backups`, uses :contentReference[oaicite:0]{index=0} to validate each subdirectory, and lets you delete the ones that fail validation.
+
+Validation runs **in parallel** for performance; deletions are controlled and can be **interactive** or **fully automatic**.
 
 ---
 
 ## ✨ Highlights
 
 - **Parallel validation** of backup subdirectories
-- Uses **`dirval`** (`directory-validator`) via CLI for robust validation
+- Uses **`dirval`** (directory-validator) via CLI
 - **Interactive** or **non-interactive** deletion flow (`--yes`)
 - Supports validating a single backup **ID** or **all** backups
+- Clean **Python package** with `pyproject.toml`
+- **Unit + Docker-based E2E tests**
 
 ---
 
 ## 📦 Installation
 
-This project is installable via **pkgmgr** (Kevin’s package manager).
-
-**New pkgmgr alias:** `cleanback`
+### Via pip (recommended)
 
 ```bash
-# Install pkgmgr first (if you don't have it):
-# https://github.com/kevinveenbirkenbach/package-manager
-
-pkgmgr install cleanback
+pip install cleanback
 ````
 
-> `dirval` is declared as a dependency (see `requirements.yml`) and will be resolved by pkgmgr.
+This installs:
+
+* the `cleanback` CLI
+* `dirval` as a dependency (declared in `pyproject.toml`)
+
+### Editable install (for development)
+
+```bash
+git clone https://github.com/kevinveenbirkenbach/cleanup-failed-backups
+cd cleanup-failed-backups
+pip install -e .
+```
 
 ---
 
 ## 🔧 Requirements
 
-* Python 3.8+
-* `dirval` available on PATH (resolved automatically by `pkgmgr install cleanback`)
-* Access to `/Backups` directory tree
+* Python **3.8+**
+* Access to the `/Backups` directory tree
+* `dirval` (installed automatically via pip dependency)
 
 ---
 
 ## 🚀 Usage
 
-The executable is `main.py`:
+### CLI entrypoint
+
+After installation, the command is:
 
 ```bash
-# Validate a single backup ID (under /Backups/<ID>/backup-docker-to-local)
-python3 main.py --id <ID>
-
-# Validate ALL backup IDs under /Backups/*/backup-docker-to-local
-python3 main.py --all
+cleanback
 ```
+
+### Validate a single backup ID
+
+```bash
+cleanback --id <ID>
+```
+
+Validates directories under:
+
+```
+/Backups/<ID>/backup-docker-to-local/*
+```
+
+### Validate all backups
+
+```bash
+cleanback --all
+```
+
+Scans:
+
+```
+/Backups/*/backup-docker-to-local/*
+```
+
+---
 
 ### Common options
 
-* `--dirval-cmd <path-or-name>` — command to run `dirval` (default: `dirval`)
-* `--workers <int>` — parallel workers (default: CPU count, min 2)
-* `--timeout <seconds>` — per-directory validation timeout (float supported; default: 300.0)
-* `--yes` — **non-interactive**: auto-delete directories that fail validation
+| Option               | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| `--dirval-cmd <cmd>` | Path or name of `dirval` executable (default: `dirval`)            |
+| `--workers <n>`      | Parallel workers (default: CPU count, min 2)                       |
+| `--timeout <sec>`    | Per-directory validation timeout (float supported, default: 300.0) |
+| `--yes`              | Non-interactive mode: delete failures automatically                |
+
+---
 
 ### Examples
 
 ```bash
-# Validate a single backup and prompt for deletions on failures
-python3 main.py --id 2024-09-01T12-00-00
+# Validate a single backup and prompt on failures
+cleanback --id 2024-09-01T12-00-00
 
 # Validate everything with 8 workers and auto-delete failures
-python3 main.py --all --workers 8 --yes
+cleanback --all --workers 8 --yes
 
-# Use a custom dirval binary and shorter timeout
-python3 main.py --all --dirval-cmd /usr/local/bin/dirval --timeout 5.0
+# Use a custom dirval binary and short timeout
+cleanback --all --dirval-cmd /usr/local/bin/dirval --timeout 5.0
 ```
 
 ---
 
 ## 🧪 Tests
 
+### Run all tests
+
 ```bash
 make test
 ```
 
-This runs the unit tests in `test.py`. Tests create a temporary `/Backups`-like tree and a fake `dirval` to simulate success/failure/timeout behavior.
-
 ---
 
-## 📁 Project Layout
+## 🔒 Safety & Design Notes
 
-* `main.py` — CLI entry point (parallel validator + cleanup)
-* `test.py` — unit tests
-* `requirements.yml` — `pkgmgr` dependencies (includes `dirval`)
-* `Makefile` — `make test` and an informational `make install`
+* **No host filesystem is modified** during tests
+  (E2E tests run exclusively inside Docker)
+* Deletions are **explicitly confirmed** unless `--yes` is used
+* Timeouts are treated as **validation failures**
+* Validation and deletion phases are **clearly separated**
 
 ---
 

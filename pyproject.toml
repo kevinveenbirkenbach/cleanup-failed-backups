@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cleanback"
+version = "0.1.0"
+description = "Cleanup Failed Docker Backups — parallel validator (using dirval)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [{ name = "Kevin Veen-Birkenbach", email = "kevin@veen.world" }]
+keywords = ["backup", "docker", "validation", "cleanup", "dirval"]
+dependencies = [
+  "dirval>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kevinveenbirkenbach/cleanup-failed-backups"
+Repository = "https://github.com/kevinveenbirkenbach/cleanup-failed-backups"
+
+[project.scripts]
+cleanback = "cleanback.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

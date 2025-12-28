@@ -1,18 +1,17 @@
 # Makefile for Cleanup Failed Backups
 
-.PHONY: test install help
+.PHONY: install help test test-unit test-e2e
 
 help:
 	@echo "Available targets:"
 	@echo "  make test     - Run unit tests"
-	@echo "  make install  - Show installation instructions"
 
-test:
+test: test-unit test-e2e
+
+test-unit:
 	@echo ">> Running tests"
-	@python3 -m unittest -v test.py
+	@python3 -m unittest -v tests/unit/test_main.py
 
-install:
-	@echo ">> Installation instructions:"
-	@echo "   This software can be installed with pkgmgr:"
-	@echo "     pkgmgr install cleanback"
-	@echo "   See project: https://github.com/kevinveenbirkenbach/package-manager"
+test-e2e:
+	docker build -f tests/e2e/Dockerfile.e2e -t cleanback-e2e .
+	docker run --rm cleanback-e2e

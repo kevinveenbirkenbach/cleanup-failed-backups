@@ -8,10 +8,10 @@ import contextlib
 from pathlib import Path
 from unittest.mock import patch
 
-# Import cleanup main.py
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import main  # noqa: E402
+# Import cleanback package entrypoint
+ROOT = Path(__file__).resolve().parents[2]  # repo root
+sys.path.insert(0, str(ROOT / "src"))
+from cleanback import __main__ as main  # noqa: E402
 
 # Keep tests snappy but reliable:
 # - "timeout" dirs sleep 0.3s in fake dirval
