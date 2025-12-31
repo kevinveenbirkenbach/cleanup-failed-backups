@@ -118,7 +118,7 @@ class CleanbackE2EDockerTests(unittest.TestCase):
         env = os.environ.copy()
 
         # Prepend fake dirval path for this test run
-        env["PATH"] = f"{self.bin_dir}:{env.get('PATH','')}"
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
 
         # Run: python -m cleanback --id <ID> --yes
         # We must point BACKUPS_ROOT to our run_root. Easiest: set /Backups = run_root
@@ -131,11 +131,19 @@ class CleanbackE2EDockerTests(unittest.TestCase):
         composite_id = f"{self.run_root.name}/{self.backup_id}"
 
         cmd = [
-            "python", "-m", "cleanback",
-            "--id", composite_id,
-            "--dirval-cmd", "dirval",
-            "--workers", "4",
-            "--timeout", SHORT_TIMEOUT,
+            "python",
+            "-m",
+            "cleanback",
+            "--backups-root",
+            "/Backups",
+            "--id",
+            composite_id,
+            "--dirval-cmd",
+            "dirval",
+            "--workers",
+            "4",
+            "--timeout",
+            SHORT_TIMEOUT,
             "--yes",
         ]
         proc = subprocess.run(cmd, text=True, capture_output=True, env=env)
@@ -143,7 +151,10 @@ class CleanbackE2EDockerTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, msg=proc.stderr or proc.stdout)
         self.assertTrue(self.good.exists(), "good should remain")
         self.assertFalse(self.bad.exists(), "bad should be deleted")
-        self.assertFalse(self.timeout.exists(), "timeout should be deleted (timeout treated as failure)")
+        self.assertFalse(
+            self.timeout.exists(),
+            "timeout should be deleted (timeout treated as failure)",
+        )
         self.assertIn("Summary:", proc.stdout)
 
 

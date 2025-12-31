@@ -8,7 +8,7 @@
 **Repository:** https://github.com/kevinveenbirkenbach/cleanup-failed-backups
 
 `cleanback` validates and (optionally) cleans up **failed Docker backup directories**.  
-It scans backup folders under `/Backups`, uses :contentReference[oaicite:0]{index=0} to validate each subdirectory, and lets you delete the ones that fail validation.
+It scans backup folders under a configurable backups root (e.g. `/Backups`), uses `dirval` to validate each subdirectory, and lets you delete the ones that fail validation.
 
 Validation runs **in parallel** for performance; deletions are controlled and can be **interactive** or **fully automatic**.
 
@@ -51,7 +51,7 @@ pip install -e .
 ## 🔧 Requirements
 
 * Python **3.8+**
-* Access to the `/Backups` directory tree
+* Access to the backups root directory tree (e.g. `/Backups`)
 * `dirval` (installed automatically via pip dependency)
 
 ---
@@ -69,7 +69,7 @@ cleanback
 ### Validate a single backup ID
 
 ```bash
-cleanback --id <ID>
+cleanback --backups-root /Backups --id <ID>
 ```
 
 Validates directories under:
@@ -81,7 +81,7 @@ Validates directories under:
 ### Validate all backups
 
 ```bash
-cleanback --all
+cleanback --backups-root /Backups --all
 ```
 
 Scans:
@@ -107,13 +107,13 @@ Scans:
 
 ```bash
 # Validate a single backup and prompt on failures
-cleanback --id 2024-09-01T12-00-00
+cleanback --backups-root /Backups --id 2024-09-01T12-00-00
 
 # Validate everything with 8 workers and auto-delete failures
-cleanback --all --workers 8 --yes
+cleanback --backups-root /Backups --all --workers 8 --yes
 
 # Use a custom dirval binary and short timeout
-cleanback --all --dirval-cmd /usr/local/bin/dirval --timeout 5.0
+cleanback --backups-root /Backups --all --dirval-cmd /usr/local/bin/dirval --timeout 5.0
 ```
 
 ---

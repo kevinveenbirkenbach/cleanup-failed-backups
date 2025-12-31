@@ -16,8 +16,8 @@ from cleanback import __main__ as main  # noqa: E402
 # Keep tests snappy but reliable:
 # - "timeout" dirs sleep 0.3s in fake dirval
 # - we pass --timeout 0.1s -> they will time out
-FAKE_TIMEOUT_SLEEP = 0.3   # 300 ms
-SHORT_TIMEOUT = "0.1"      # 100 ms
+FAKE_TIMEOUT_SLEEP = 0.3  # 300 ms
+SHORT_TIMEOUT = "0.1"  # 100 ms
 
 FAKE_DIRVAL = f"""#!/usr/bin/env python3
 import sys, time, argparse, pathlib
@@ -49,6 +49,7 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 """
+
 
 class CleanupBackupsUsingDirvalTests(unittest.TestCase):
     def setUp(self):
@@ -89,12 +90,7 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         self.stdout_cm.__enter__()
         self.stderr_cm.__enter__()
 
-        # Patch BACKUPS_ROOT to temp root
-        self.backups_patcher = patch.object(main, "BACKUPS_ROOT", self.backups_root)
-        self.backups_patcher.start()
-
     def tearDown(self):
-        self.backups_patcher.stop()
         self.stdout_cm.__exit__(None, None, None)
         self.stderr_cm.__exit__(None, None, None)
         self.tmpdir.cleanup()
@@ -105,32 +101,52 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         out = self._stdout.getvalue()
         err = self._stderr.getvalue()
         dur = time.time() - start
-        self._stdout.seek(0); self._stdout.truncate(0)
-        self._stderr.seek(0); self._stderr.truncate(0)
+        self._stdout.seek(0)
+        self._stdout.truncate(0)
+        self._stderr.seek(0)
+        self._stderr.truncate(0)
         return rc, out, err, dur
 
     def test_id_mode_yes_deletes_failures(self):
-        rc, out, err, _ = self.run_main([
-            "--id", "ID1",
-            "--dirval-cmd", str(self.dirval),
-            "--workers", "4",
-            "--timeout", SHORT_TIMEOUT,
-            "--yes",
-        ])
+        rc, out, err, _ = self.run_main(
+            [
+                "--backups-root",
+                str(self.backups_root),
+                "--id",
+                "ID1",
+                "--dirval-cmd",
+                str(self.dirval),
+                "--workers",
+                "4",
+                "--timeout",
+                SHORT_TIMEOUT,
+                "--yes",
+            ]
+        )
         self.assertEqual(rc, 0, msg=err or out)
         self.assertTrue(self.goodA.exists(), "goodA should remain")
         self.assertFalse(self.badB.exists(), "badB should be deleted")
-        self.assertFalse(self.timeoutC.exists(), "timeoutC should be deleted (timeout treated as failure)")
+        self.assertFalse(
+            self.timeoutC.exists(),
+            "timeoutC should be deleted (timeout treated as failure)",
+        )
         self.assertIn("Summary:", out)
 
     def test_all_mode(self):
-        rc, out, err, _ = self.run_main([
-            "--all",
-            "--dirval-cmd", str(self.dirval),
-            "--workers", "4",
-            "--timeout", SHORT_TIMEOUT,
-            "--yes",
-        ])
+        rc, out, err, _ = self.run_main(
+            [
+                "--backups-root",
+                str(self.backups_root),
+                "--all",
+                "--dirval-cmd",
+                str(self.dirval),
+                "--workers",
+                "4",
+                "--timeout",
+                SHORT_TIMEOUT,
+                "--yes",
+            ]
+        )
         self.assertEqual(rc, 0, msg=err or out)
         self.assertTrue(self.goodA.exists())
         self.assertFalse(self.badB.exists())
@@ -139,49 +155,80 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         self.assertFalse(self.badY.exists())
 
     def test_dirval_missing_errors(self):
-        rc, out, err, _ = self.run_main([
-            "--id", "ID1",
-            "--dirval-cmd", str(self.backups_root / "nope-dirval"),
-            "--timeout", SHORT_TIMEOUT,
-            "--yes",
-        ])
+        rc, out, err, _ = self.run_main(
+            [
+                "--backups-root",
+                str(self.backups_root),
+                "--id",
+                "ID1",
+                "--dirval-cmd",
+                str(self.backups_root / "nope-dirval"),
+                "--timeout",
+                SHORT_TIMEOUT,
+                "--yes",
+            ]
+        )
         self.assertEqual(rc, 0, msg=err or out)
         self.assertIn("dirval not found", out + err)
 
     def test_no_targets_message(self):
         empty = self.backups_root / "EMPTY" / "backup-docker-to-local"
         empty.mkdir(parents=True, exist_ok=True)
-        rc, out, err, _ = self.run_main([
-            "--id", "EMPTY",
-            "--dirval-cmd", str(self.dirval),
-            "--timeout", SHORT_TIMEOUT,
-        ])
+        rc, out, err, _ = self.run_main(
+            [
+                "--backups-root",
+                str(self.backups_root),
+                "--id",
+                "EMPTY",
+                "--dirval-cmd",
+                str(self.dirval),
+                "--timeout",
+                SHORT_TIMEOUT,
+            ]
+        )
         self.assertEqual(rc, 0)
         self.assertIn("No subdirectories to validate. Nothing to do.", out)
 
     def test_interactive_keeps_when_no(self):
         with patch("builtins.input", return_value=""):
-            rc, out, err, _ = self.run_main([
-                "--id", "ID2",
-                "--dirval-cmd", str(self.dirval),
-                "--workers", "1",
-                "--timeout", SHORT_TIMEOUT,
-            ])
+            rc, out, err, _ = self.run_main(
+                [
+                    "--backups-root",
+                    str(self.backups_root),
+                    "--id",
+                    "ID2",
+                    "--dirval-cmd",
+                    str(self.dirval),
+                    "--workers",
+                    "1",
+                    "--timeout",
+                    SHORT_TIMEOUT,
+                ]
+            )
         self.assertEqual(rc, 0, msg=err or out)
         self.assertTrue(self.badY.exists(), "badY should be kept without confirmation")
         self.assertTrue(self.goodX.exists())
 
     def test_interactive_yes_deletes(self):
         with patch("builtins.input", return_value="y"):
-            rc, out, err, _ = self.run_main([
-                "--id", "ID2",
-                "--dirval-cmd", str(self.dirval),
-                "--workers", "1",
-                "--timeout", SHORT_TIMEOUT,
-            ])
+            rc, out, err, _ = self.run_main(
+                [
+                    "--backups-root",
+                    str(self.backups_root),
+                    "--id",
+                    "ID2",
+                    "--dirval-cmd",
+                    str(self.dirval),
+                    "--workers",
+                    "1",
+                    "--timeout",
+                    SHORT_TIMEOUT,
+                ]
+            )
         self.assertEqual(rc, 0, msg=err or out)
         self.assertFalse(self.badY.exists(), "badY should be deleted")
         self.assertTrue(self.goodX.exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

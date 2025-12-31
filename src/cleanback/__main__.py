@@ -3,8 +3,8 @@
 Cleanup Failed Docker Backups — parallel validator (using dirval)
 
 Validates backup subdirectories under:
-- /Backups/<ID>/backup-docker-to-local          (when --id is used)
-- /Backups/*/backup-docker-to-local             (when --all is used)
+- <BACKUPS_ROOT>/<ID>/backup-docker-to-local          (when --id is used)
+- <BACKUPS_ROOT>/*/backup-docker-to-local             (when --all is used)
 
 For each subdirectory:
 - Runs `dirval <subdir> --validate`.
@@ -19,17 +19,15 @@ Parallelism:
 from __future__ import annotations
 
 import argparse
-import sys
+import multiprocessing
 import shutil
 import subprocess
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
-import multiprocessing
-import time
-
-BACKUPS_ROOT = Path("/Backups")
 
 
 @dataclass(frozen=True)
@@ -41,25 +39,28 @@ class ValidationResult:
     stdout: str
 
 
-def discover_target_subdirs(backup_id: Optional[str], all_mode: bool) -> List[Path]:
+def discover_target_subdirs(
+    backups_root: Path, backup_id: Optional[str], all_mode: bool
+) -> List[Path]:
     """
     Return a list of subdirectories to validate:
-      - If backup_id is given: /Backups/<id>/backup-docker-to-local/* (dirs only)
-      - If --all: for each /Backups/* that has backup-docker-to-local, include its subdirs
+      - If backup_id is given: <root>/<id>/backup-docker-to-local/* (dirs only)
+      - If --all: for each <root>/* that has backup-docker-to-local, include its subdirs
     """
     targets: List[Path] = []
 
+    if not backups_root.is_dir():
+        raise FileNotFoundError(f"Backups root does not exist: {backups_root}")
+
     if all_mode:
-        if not BACKUPS_ROOT.is_dir():
-            raise FileNotFoundError(f"Backups root does not exist: {BACKUPS_ROOT}")
-        for backup_folder in sorted(p for p in BACKUPS_ROOT.iterdir() if p.is_dir()):
+        for backup_folder in sorted(p for p in backups_root.iterdir() if p.is_dir()):
             candidate = backup_folder / "backup-docker-to-local"
             if candidate.is_dir():
                 targets.extend(sorted([p for p in candidate.iterdir() if p.is_dir()]))
     else:
         if not backup_id:
             raise ValueError("Either --id or --all must be provided.")
-        base = BACKUPS_ROOT / backup_id / "backup-docker-to-local"
+        base = backups_root / backup_id / "backup-docker-to-local"
         if not base.is_dir():
             raise FileNotFoundError(f"Directory does not exist: {base}")
         targets = sorted([p for p in base.iterdir() if p.is_dir()])
@@ -67,7 +68,9 @@ def discover_target_subdirs(backup_id: Optional[str], all_mode: bool) -> List[Pa
     return targets
 
 
-def run_dirval_validate(subdir: Path, dirval_cmd: str, timeout: float) -> ValidationResult:
+def run_dirval_validate(
+    subdir: Path, dirval_cmd: str, timeout: float
+) -> ValidationResult:
     """
     Execute dirval:
         <dirval_cmd> "<SUBDIR>" --validate
@@ -108,16 +111,23 @@ def run_dirval_validate(subdir: Path, dirval_cmd: str, timeout: float) -> Valida
         )
 
 
-def parallel_validate(subdirs: List[Path], dirval_cmd: str, workers: int, timeout: float) -> List[ValidationResult]:
+def parallel_validate(
+    subdirs: List[Path], dirval_cmd: str, workers: int, timeout: float
+) -> List[ValidationResult]:
     results: List[ValidationResult] = []
     if not subdirs:
         return results
 
-    print(f"Validating {len(subdirs)} directories with {workers} workers (dirval: {dirval_cmd})...")
+    print(
+        f"Validating {len(subdirs)} directories with {workers} workers (dirval: {dirval_cmd})..."
+    )
     start = time.time()
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        future_map = {pool.submit(run_dirval_validate, sd, dirval_cmd, timeout): sd for sd in subdirs}
+        future_map = {
+            pool.submit(run_dirval_validate, sd, dirval_cmd, timeout): sd
+            for sd in subdirs
+        }
         for fut in as_completed(future_map):
             res = fut.result()
             status = "ok" if res.ok else "error"
@@ -140,7 +150,7 @@ def print_dir_listing(path: Path, max_items: int = 50) -> None:
         typ = "<DIR>" if entry.is_dir() else "     "
         print(f"  {typ} {entry.name}")
         if i + 1 >= max_items and len(entries) > i + 1:
-            print(f"  ... (+{len(entries) - (i+1)} more)")
+            print(f"  ... (+{len(entries) - (i + 1)} more)")
             break
 
 
@@ -190,9 +200,24 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate (and optionally delete) failed backup subdirectories in parallel using dirval."
     )
+
+    parser.add_argument(
+        "--backups-root",
+        required=True,
+        type=Path,
+        help="Root directory containing backup folders (required).",
+    )
+
     scope = parser.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--id", dest="backup_id", help="Backup folder name under /Backups.")
-    scope.add_argument("--all", dest="all_mode", action="store_true", help="Scan all /Backups/* folders.")
+    scope.add_argument(
+        "--id", dest="backup_id", help="Backup folder name under backups root."
+    )
+    scope.add_argument(
+        "--all",
+        dest="all_mode",
+        action="store_true",
+        help="Scan all backups root/* folders.",
+    )
 
     parser.add_argument(
         "--dirval-cmd",
@@ -223,7 +248,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
 
     try:
-        subdirs = discover_target_subdirs(args.backup_id, bool(args.all_mode))
+        subdirs = discover_target_subdirs(
+            args.backups_root, args.backup_id, bool(args.all_mode)
+        )
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
@@ -242,7 +269,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"\n{len(failures)} directory(ies) failed validation.")
     deleted = process_deletions(failures, assume_yes=args.yes)
     kept = len(failures) - deleted
-    print(f"\nSummary: deleted={deleted}, kept={kept}, ok={len(results) - len(failures)}")
+    print(
+        f"\nSummary: deleted={deleted}, kept={kept}, ok={len(results) - len(failures)}"
+    )
     return 0
 
 
