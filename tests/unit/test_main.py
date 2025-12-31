@@ -153,6 +153,36 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         self.assertFalse(self.timeoutC.exists())
         self.assertTrue(self.goodX.exists())
         self.assertFalse(self.badY.exists())
+        
+    def test_all_mode_force_keep_skips_last_backup_folder(self):
+        # Given backup folders: ID1, ID2 (sorted)
+        # --force-keep 1 should skip ID2 completely.
+        rc, out, err, _ = self.run_main(
+            [
+                "--backups-root",
+                str(self.backups_root),
+                "--all",
+                "--force-keep",
+                "1",
+                "--dirval-cmd",
+                str(self.dirval),
+                "--workers",
+                "4",
+                "--timeout",
+                SHORT_TIMEOUT,
+                "--yes",
+            ]
+        )
+        self.assertEqual(rc, 0, msg=err or out)
+
+        # ID1 should be processed
+        self.assertTrue(self.goodA.exists())
+        self.assertFalse(self.badB.exists())
+        self.assertFalse(self.timeoutC.exists())
+
+        # ID2 should be untouched
+        self.assertTrue(self.goodX.exists())
+        self.assertTrue(self.badY.exists())
 
     def test_dirval_missing_errors(self):
         rc, out, err, _ = self.run_main(

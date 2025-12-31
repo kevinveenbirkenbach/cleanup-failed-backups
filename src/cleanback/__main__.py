@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Cleanup Failed Docker Backups — parallel validator (using dirval)
+with optional "keep last N backups" behavior in --all mode.
 
 Validates backup subdirectories under:
 - <BACKUPS_ROOT>/<ID>/backup-docker-to-local          (when --id is used)
@@ -40,7 +41,7 @@ class ValidationResult:
 
 
 def discover_target_subdirs(
-    backups_root: Path, backup_id: Optional[str], all_mode: bool
+    backups_root: Path, backup_id: Optional[str], all_mode: bool, force_keep: int
 ) -> List[Path]:
     """
     Return a list of subdirectories to validate:
@@ -48,12 +49,23 @@ def discover_target_subdirs(
       - If --all: for each <root>/* that has backup-docker-to-local, include its subdirs
     """
     targets: List[Path] = []
+    if force_keep < 0:
+        raise ValueError("--force-keep must be >= 0")
 
     if not backups_root.is_dir():
         raise FileNotFoundError(f"Backups root does not exist: {backups_root}")
 
     if all_mode:
-        for backup_folder in sorted(p for p in backups_root.iterdir() if p.is_dir()):
+        backup_folders = sorted(p for p in backups_root.iterdir() if p.is_dir())
+
+        # Skip the last N backup folders (by sorted name order).
+        # This is intentionally simple: timestamp-like folder names sort correctly.
+        if force_keep:
+            if len(backup_folders) <= force_keep:
+                return []
+            backup_folders = backup_folders[:-force_keep]
+
+        for backup_folder in backup_folders:
             candidate = backup_folder / "backup-docker-to-local"
             if candidate.is_dir():
                 targets.extend(sorted([p for p in candidate.iterdir() if p.is_dir()]))
@@ -241,6 +253,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Do not prompt; delete failing directories automatically.",
     )
+    parser.add_argument(
+        "--force-keep",
+        type=int,
+        default=0,
+        help="In --all mode: keep (skip) the last N backup folders under --backups-root (default: 0).",
+    )
     return parser.parse_args(argv)
 
 
@@ -249,7 +267,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         subdirs = discover_target_subdirs(
-            args.backups_root, args.backup_id, bool(args.all_mode)
+            args.backups_root,
+            args.backup_id,
+            bool(args.all_mode),
+            int(args.force_keep),
         )
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

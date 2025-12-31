@@ -100,6 +100,7 @@ Scans:
 | `--workers <n>`      | Parallel workers (default: CPU count, min 2)                       |
 | `--timeout <sec>`    | Per-directory validation timeout (float supported, default: 300.0) |
 | `--yes`              | Non-interactive mode: delete failures automatically                |
+| `--force-keep <n>`   | In `--all` mode: skip the last *n* backup folders (default: 0)      |
 
 ---
 

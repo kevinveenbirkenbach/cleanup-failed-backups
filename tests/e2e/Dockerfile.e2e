@@ -14,4 +14,4 @@ RUN python -m pip install -U pip \
 RUN mkdir -p /Backups
 
 # Run E2E unittest
-CMD ["python", "-m", "unittest", "-v", "tests.e2e.test_e2e_docker"]
+CMD ["python", "-m", "unittest", "discover", "-v", "-s", "tests/e2e", "-p", "test_*.py"]
