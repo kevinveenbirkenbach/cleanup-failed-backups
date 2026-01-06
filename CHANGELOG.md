@@ -1,3 +1,8 @@
+## [1.3.0] - 2026-01-06
+
+* Cleanup is now production-safe: only invalid backups are deleted; timeouts no longer trigger automatic removal.
+
+
 ## [1.2.1] - 2026-01-06
 
 * Fixed: --force-keep now applies to timestamp subdirectories inside each backup-docker-to-local folder instead of skipping entire backup folders.
