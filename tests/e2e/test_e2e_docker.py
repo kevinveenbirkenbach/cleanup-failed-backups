@@ -121,13 +121,6 @@ class CleanbackE2EDockerTests(unittest.TestCase):
         env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
 
         # Run: python -m cleanback --id <ID> --yes
-        # We must point BACKUPS_ROOT to our run_root. Easiest: set /Backups = run_root
-        # But code currently has BACKUPS_ROOT = /Backups constant.
-        #
-        # Therefore, we create our test tree under /Backups (done above) and pass --id
-        # relative to that structure by using run_root/<ID>. To do that, we make
-        # run_root the direct child under /Backups, then we pass the composite id:
-        # "<run-folder>/<ID>".
         composite_id = f"{self.run_root.name}/{self.backup_id}"
 
         cmd = [
@@ -148,14 +141,19 @@ class CleanbackE2EDockerTests(unittest.TestCase):
         ]
         proc = subprocess.run(cmd, text=True, capture_output=True, env=env)
 
-        self.assertEqual(proc.returncode, 0, msg=proc.stderr or proc.stdout)
+        # New behavior:
+        # - invalid dirs are deleted and do NOT cause failure
+        # - timeouts are treated as infrastructure problems -> exit code 1 and NOT deleted
+        self.assertEqual(proc.returncode, 1, msg=proc.stderr or proc.stdout)
+
         self.assertTrue(self.good.exists(), "good should remain")
         self.assertFalse(self.bad.exists(), "bad should be deleted")
-        self.assertFalse(
+        self.assertTrue(
             self.timeout.exists(),
-            "timeout should be deleted (timeout treated as failure)",
+            "timeout should NOT be deleted (timeouts are infrastructure problems)",
         )
         self.assertIn("Summary:", proc.stdout)
+        self.assertIn("validation infrastructure problem", proc.stdout.lower())
 
 
 if __name__ == "__main__":

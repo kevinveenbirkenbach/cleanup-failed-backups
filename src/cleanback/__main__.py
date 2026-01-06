@@ -277,6 +277,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _is_timeout(res: ValidationResult) -> bool:
+    return res.returncode == 124 or "timed out" in (res.stderr or "").lower()
+
+
+def _is_dirval_missing(res: ValidationResult) -> bool:
+    return res.returncode == 127 or "not found" in (res.stderr or "").lower()
+
+
+def _is_invalid(res: ValidationResult) -> bool:
+    # dirval: 0 = ok, 1 = invalid, others = infra errors (timeout/missing/etc.)
+    return res.returncode == 1
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
 
@@ -296,18 +309,43 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     results = parallel_validate(subdirs, args.dirval_cmd, args.workers, args.timeout)
-    failures = [r for r in results if not r.ok]
 
-    if not failures:
+    invalids = [r for r in results if _is_invalid(r)]
+    timeouts = [r for r in results if _is_timeout(r)]
+    missing = [r for r in results if _is_dirval_missing(r)]
+
+    deleted = 0
+    if invalids:
+        print(f"\n{len(invalids)} directory(ies) are invalid (dirval rc=1).")
+        deleted = process_deletions(invalids, assume_yes=args.yes)
+
+    ok_count = sum(1 for r in results if r.ok)
+
+    if timeouts or missing:
+        print("\nERROR: validation infrastructure problem detected.")
+        if timeouts:
+            print(f"- timeouts: {len(timeouts)} (will NOT delete these)")
+            for r in timeouts[:10]:
+                print(f"  timeout: {r.subdir}")
+            if len(timeouts) > 10:
+                print(f"  ... (+{len(timeouts) - 10} more)")
+        if missing:
+            print(f"- dirval missing: {len(missing)} (will NOT delete these)")
+            for r in missing[:10]:
+                print(f"  missing: {r.subdir}")
+            if len(missing) > 10:
+                print(f"  ... (+{len(missing) - 10} more)")
+
+        print(
+            f"\nSummary: deleted={deleted}, invalid={len(invalids)}, ok={ok_count}, timeouts={len(timeouts)}, missing={len(missing)}"
+        )
+        return 1
+
+    if not invalids:
         print("\nAll directories validated successfully. No action required.")
         return 0
 
-    print(f"\n{len(failures)} directory(ies) failed validation.")
-    deleted = process_deletions(failures, assume_yes=args.yes)
-    kept = len(failures) - deleted
-    print(
-        f"\nSummary: deleted={deleted}, kept={kept}, ok={len(results) - len(failures)}"
-    )
+    print(f"\nSummary: deleted={deleted}, invalid={len(invalids)}, ok={ok_count}")
     return 0
 
 

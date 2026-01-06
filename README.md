@@ -7,21 +7,24 @@
 
 **Repository:** https://github.com/kevinveenbirkenbach/cleanup-failed-backups
 
-`cleanback` validates and (optionally) cleans up **failed Docker backup directories**.  
-It scans backup folders under a configurable backups root (e.g. `/Backups`), uses `dirval` to validate each subdirectory, and lets you delete the ones that fail validation.
+`cleanback` validates and (optionally) cleans up **failed Docker backup directories** in a **production-safe** way.
 
-Validation runs **in parallel** for performance; deletions are controlled and can be **interactive** or **fully automatic**.
+It scans backup folders under a configurable backups root (for example `/Backups`), uses `dirval` to validate each backup subdirectory, and removes **only those backups that are confirmed to be invalid**.
+
+Validation runs **in parallel** for performance; deletions are **explicitly controlled** and can be interactive or fully automated.
 
 ---
 
 ## ✨ Highlights
 
 - **Parallel validation** of backup subdirectories
-- Uses **`dirval`** (directory-validator) via CLI
-- **Interactive** or **non-interactive** deletion flow (`--yes`)
+- Uses **`dirval`** (directory validator) via CLI
+- **Safe deletion model**: only truly invalid backups are removed
+- **Interactive** or **non-interactive** cleanup (`--yes`)
 - Supports validating a single backup **ID** or **all** backups
+- Clear **exit code semantics** for CI and system services
 - Clean **Python package** with `pyproject.toml`
-- **Unit + Docker-based E2E tests**
+- **Unit tests** and **Docker-based E2E tests**
 
 ---
 
@@ -31,7 +34,7 @@ Validation runs **in parallel** for performance; deletions are controlled and ca
 
 ```bash
 pip install cleanback
-````
+```
 
 This installs:
 
@@ -51,7 +54,7 @@ pip install -e .
 ## 🔧 Requirements
 
 * Python **3.8+**
-* Access to the backups root directory tree (e.g. `/Backups`)
+* Read/write access to the backups root directory tree (e.g. `/Backups`)
 * `dirval` (installed automatically via pip dependency)
 
 ---
@@ -66,6 +69,8 @@ After installation, the command is:
 cleanback
 ```
 
+---
+
 ### Validate a single backup ID
 
 ```bash
@@ -77,6 +82,8 @@ Validates directories under:
 ```
 /Backups/<ID>/backup-docker-to-local/*
 ```
+
+---
 
 ### Validate all backups
 
@@ -92,50 +99,78 @@ Scans:
 
 ---
 
-### Common options
+## ⚙️ Common options
 
-| Option               | Description                                                        |
-| -------------------- | ------------------------------------------------------------------ |
-| `--dirval-cmd <cmd>` | Path or name of `dirval` executable (default: `dirval`)            |
-| `--workers <n>`      | Parallel workers (default: CPU count, min 2)                       |
-| `--timeout <sec>`    | Per-directory validation timeout (float supported, default: 300.0) |
-| `--yes`              | Non-interactive mode: delete failures automatically                |
-| `--force-keep <n>`   | In `--all` mode: skip the last *n* backup folders (default: 0)      |
+| Option               | Description                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `--dirval-cmd <cmd>` | Path or name of `dirval` executable (default: `dirval`)                               |
+| `--workers <n>`      | Number of parallel validator workers (default: CPU count, minimum 2)                  |
+| `--timeout <sec>`    | Per-directory validation timeout in seconds (float supported, default: `300.0`)       |
+| `--yes`              | Non-interactive mode: automatically delete **invalid** backups (dirval rc=1 only)     |
+| `--force-keep <n>`   | In `--all` mode: skip the last *n* timestamp subdirectories inside each backup folder |
+
+> **Note:** Backups affected by timeouts or infrastructure errors are **never deleted automatically**, even when `--yes` is used.
 
 ---
 
-### Examples
+## 🧪 Examples
 
 ```bash
-# Validate a single backup and prompt on failures
+# Validate a single backup and prompt before deleting invalid ones
 cleanback --backups-root /Backups --id 2024-09-01T12-00-00
-
-# Validate everything with 8 workers and auto-delete failures
-cleanback --backups-root /Backups --all --workers 8 --yes
-
-# Use a custom dirval binary and short timeout
-cleanback --backups-root /Backups --all --dirval-cmd /usr/local/bin/dirval --timeout 5.0
 ```
 
----
-
-## 🧪 Tests
-
-### Run all tests
+```bash
+# Validate all backups and automatically delete invalid ones
+cleanback --backups-root /Backups --all --workers 8 --yes
+```
 
 ```bash
-make test
+# Use a custom dirval binary and a short timeout (testing only)
+cleanback \
+  --backups-root /Backups \
+  --all \
+  --dirval-cmd /usr/local/bin/dirval \
+  --timeout 5.0
 ```
 
 ---
 
 ## 🔒 Safety & Design Notes
 
-* **No host filesystem is modified** during tests
-  (E2E tests run exclusively inside Docker)
-* Deletions are **explicitly confirmed** unless `--yes` is used
-* Timeouts are treated as **validation failures**
-* Validation and deletion phases are **clearly separated**
+* **Validation and deletion are strictly separated**
+* Only backups explicitly marked **invalid by `dirval`** are eligible for deletion
+* **Timeouts and infrastructure errors are NOT treated as invalid backups**
+* Backups affected by timeouts are **never deleted automatically**
+* Infrastructure problems (timeouts, missing `dirval`) cause a **non-zero exit code**
+* Deletions require confirmation unless `--yes` is specified
+* Tests never touch the host filesystem (E2E tests run inside Docker only)
+
+This design makes `cleanback` safe for unattended operation on production systems.
+
+---
+
+## 🚦 Exit codes
+
+`cleanback` uses exit codes to clearly distinguish between backup issues and infrastructure problems:
+
+| Exit code | Meaning                                                            |
+| --------- | ------------------------------------------------------------------ |
+| `0`       | All backups valid, or invalid backups were successfully removed    |
+| `1`       | Validation infrastructure problem (e.g. timeout, missing `dirval`) |
+| `2`       | CLI usage or configuration error                                   |
+
+This makes the tool suitable for **CI pipelines**, **systemd services**, and other automation.
+
+---
+
+## 🧪 Tests
+
+Run all tests (unit + Docker-based E2E):
+
+```bash
+make test
+```
 
 ---
 

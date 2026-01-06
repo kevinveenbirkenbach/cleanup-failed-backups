@@ -123,12 +123,12 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
                 "--yes",
             ]
         )
-        self.assertEqual(rc, 0, msg=err or out)
+        self.assertEqual(rc, 1, msg=err or out)
         self.assertTrue(self.goodA.exists(), "goodA should remain")
         self.assertFalse(self.badB.exists(), "badB should be deleted")
-        self.assertFalse(
+        self.assertTrue(
             self.timeoutC.exists(),
-            "timeoutC should be deleted (timeout treated as failure)",
+            "timeoutC should NOT be deleted (timeout is infra error)",
         )
         self.assertIn("Summary:", out)
 
@@ -147,10 +147,10 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
                 "--yes",
             ]
         )
-        self.assertEqual(rc, 0, msg=err or out)
+        self.assertEqual(rc, 1, msg=err or out)
         self.assertTrue(self.goodA.exists())
         self.assertFalse(self.badB.exists())
-        self.assertFalse(self.timeoutC.exists())
+        self.assertTrue(self.timeoutC.exists())
         self.assertTrue(self.goodX.exists())
         self.assertFalse(self.badY.exists())
 
@@ -198,8 +198,8 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
                 "--yes",
             ]
         )
-        self.assertEqual(rc, 0, msg=err or out)
-        self.assertIn("dirval not found", out + err)
+        self.assertEqual(rc, 1, msg=err or out)
+        self.assertIn("dirval missing", out + err)
 
     def test_no_targets_message(self):
         empty = self.backups_root / "EMPTY" / "backup-docker-to-local"
