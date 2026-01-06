@@ -1,3 +1,8 @@
+## [1.2.1] - 2026-01-06
+
+* Fixed: --force-keep now applies to timestamp subdirectories inside each backup-docker-to-local folder instead of skipping entire backup folders.
+
+
 ## [1.2.0] - 2025-12-31
 
 * Adds a force keep N option to all mode to skip the most recent backups during cleanup, with Docker based E2E tests ensuring the latest backups are preserved.
