@@ -153,10 +153,10 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         self.assertFalse(self.timeoutC.exists())
         self.assertTrue(self.goodX.exists())
         self.assertFalse(self.badY.exists())
-        
-    def test_all_mode_force_keep_skips_last_backup_folder(self):
-        # Given backup folders: ID1, ID2 (sorted)
-        # --force-keep 1 should skip ID2 completely.
+
+    def test_all_mode_force_keep_skips_last_timestamp_subdir_per_backup_folder(self):
+        # Subdirs are sorted by name.
+        # --force-keep 1 skips the last subdir inside each backup-docker-to-local folder.
         rc, out, err, _ = self.run_main(
             [
                 "--backups-root",
@@ -175,14 +175,14 @@ class CleanupBackupsUsingDirvalTests(unittest.TestCase):
         )
         self.assertEqual(rc, 0, msg=err or out)
 
-        # ID1 should be processed
-        self.assertTrue(self.goodA.exists())
-        self.assertFalse(self.badB.exists())
-        self.assertFalse(self.timeoutC.exists())
+        # ID1 sorted: badB, goodA, timeoutC -> timeoutC is skipped, others processed
+        self.assertTrue(self.goodA.exists(), "goodA should remain")
+        self.assertFalse(self.badB.exists(), "badB should be deleted")
+        self.assertTrue(self.timeoutC.exists(), "timeoutC should be skipped (kept)")
 
-        # ID2 should be untouched
-        self.assertTrue(self.goodX.exists())
-        self.assertTrue(self.badY.exists())
+        # ID2 sorted: badY, goodX -> goodX is skipped, badY processed
+        self.assertTrue(self.goodX.exists(), "goodX should be skipped (kept)")
+        self.assertFalse(self.badY.exists(), "badY should be processed and deleted")
 
     def test_dirval_missing_errors(self):
         rc, out, err, _ = self.run_main(

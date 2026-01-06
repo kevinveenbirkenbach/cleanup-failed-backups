@@ -40,6 +40,20 @@ class ValidationResult:
     stdout: str
 
 
+def _sorted_timestamp_subdirs(path: Path) -> List[Path]:
+    # Timestamp-like folder names sort correctly lexicographically.
+    # We keep it simple: sort by name.
+    return sorted([p for p in path.iterdir() if p.is_dir()], key=lambda p: p.name)
+
+
+def _apply_force_keep(subdirs: List[Path], force_keep: int) -> List[Path]:
+    if force_keep <= 0:
+        return subdirs
+    if len(subdirs) <= force_keep:
+        return []
+    return subdirs[:-force_keep]
+
+
 def discover_target_subdirs(
     backups_root: Path, backup_id: Optional[str], all_mode: bool, force_keep: int
 ) -> List[Path]:
@@ -47,6 +61,8 @@ def discover_target_subdirs(
     Return a list of subdirectories to validate:
       - If backup_id is given: <root>/<id>/backup-docker-to-local/* (dirs only)
       - If --all: for each <root>/* that has backup-docker-to-local, include its subdirs
+    force_keep:
+      - Skips the last N timestamp subdirectories inside each backup-docker-to-local folder.
     """
     targets: List[Path] = []
     if force_keep < 0:
@@ -56,26 +72,25 @@ def discover_target_subdirs(
         raise FileNotFoundError(f"Backups root does not exist: {backups_root}")
 
     if all_mode:
-        backup_folders = sorted(p for p in backups_root.iterdir() if p.is_dir())
-
-        # Skip the last N backup folders (by sorted name order).
-        # This is intentionally simple: timestamp-like folder names sort correctly.
-        if force_keep:
-            if len(backup_folders) <= force_keep:
-                return []
-            backup_folders = backup_folders[:-force_keep]
-
+        backup_folders = sorted(
+            [p for p in backups_root.iterdir() if p.is_dir()],
+            key=lambda p: p.name,
+        )
         for backup_folder in backup_folders:
             candidate = backup_folder / "backup-docker-to-local"
             if candidate.is_dir():
-                targets.extend(sorted([p for p in candidate.iterdir() if p.is_dir()]))
+                subdirs = _sorted_timestamp_subdirs(candidate)
+                subdirs = _apply_force_keep(subdirs, force_keep)
+                targets.extend(subdirs)
     else:
         if not backup_id:
             raise ValueError("Either --id or --all must be provided.")
         base = backups_root / backup_id / "backup-docker-to-local"
         if not base.is_dir():
             raise FileNotFoundError(f"Directory does not exist: {base}")
-        targets = sorted([p for p in base.iterdir() if p.is_dir()])
+        subdirs = _sorted_timestamp_subdirs(base)
+        subdirs = _apply_force_keep(subdirs, force_keep)
+        targets = subdirs
 
     return targets
 
@@ -257,7 +272,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--force-keep",
         type=int,
         default=0,
-        help="In --all mode: keep (skip) the last N backup folders under --backups-root (default: 0).",
+        help="Keep (skip) the last N timestamp subdirectories inside each backup-docker-to-local folder (default: 0).",
     )
     return parser.parse_args(argv)
 

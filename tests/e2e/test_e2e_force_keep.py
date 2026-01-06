@@ -41,10 +41,19 @@ if __name__ == "__main__":
 class CleanbackE2EForceKeepTests(unittest.TestCase):
     """
     E2E test that validates --force-keep in --all mode.
-    It creates two backup folders directly under /Backups so --all can find them:
+
+    The current behavior is:
+    - In --all mode, cleanback discovers each /Backups/<ID>/backup-docker-to-local/*
+    - Within each backup-docker-to-local folder, subdirs are sorted by name
+    - With --force-keep N, the last N subdirs in that folder are skipped (kept)
+
+    This test creates two backup folders under /Backups so --all can find them:
       /Backups/<prefix>-01/backup-docker-to-local/{good,bad}
       /Backups/<prefix>-02/backup-docker-to-local/{good,bad}
-    With --force-keep 1, the last (sorted) backup folder (<prefix>-02) is skipped.
+
+    With --force-keep 1:
+    - In each folder, "good" is the last (sorted) and is skipped (kept)
+    - "bad" is processed and deleted
     """
 
     def setUp(self):
@@ -123,7 +132,7 @@ class CleanbackE2EForceKeepTests(unittest.TestCase):
         except Exception:
             pass
 
-    def test_all_mode_force_keep_skips_last_backup_folder(self):
+    def test_all_mode_force_keep_skips_last_timestamp_subdir_per_backup_folder(self):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
 
@@ -148,13 +157,12 @@ class CleanbackE2EForceKeepTests(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 0, msg=proc.stderr or proc.stdout)
 
-        # First backup folder (<prefix>-01) should be processed: bad removed, good kept
-        self.assertTrue(self.b1_good.exists(), "b1 good should remain")
+        # In each folder, sorted subdirs are: bad, good -> good is skipped, bad is processed
+        self.assertTrue(self.b1_good.exists(), "b1 good should remain (skipped)")
         self.assertFalse(self.b1_bad.exists(), "b1 bad should be deleted")
 
-        # Last backup folder (<prefix>-02) should be skipped entirely: both remain
         self.assertTrue(self.b2_good.exists(), "b2 good should remain (skipped)")
-        self.assertTrue(self.b2_bad.exists(), "b2 bad should remain (skipped)")
+        self.assertFalse(self.b2_bad.exists(), "b2 bad should be deleted")
 
         self.assertIn("Summary:", proc.stdout)
 
